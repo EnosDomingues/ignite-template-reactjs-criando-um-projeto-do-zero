@@ -1,4 +1,6 @@
 import { GetStaticPaths, GetStaticProps } from 'next';
+import { RichText } from 'prismic-dom';
+import Header from '../../components/Header';
 
 import { getPrismicClient } from '../../services/prismic';
 
@@ -26,20 +28,56 @@ interface PostProps {
   post: Post;
 }
 
-// export default function Post() {
-//   // TODO
-// }
+export default function Post({ post }: PostProps): JSX.Element {
+  return (
+    <>
+      <Header />
+      <main className={commonStyles.container}>
+        <div className={styles.content}>
+          <img src="" alt="banner" />
+          <h1>Criando um app CRA do zero</h1>
+        </div>
+      </main>
+    </>
+  );
+}
 
-// export const getStaticPaths = async () => {
-//   const prismic = getPrismicClient();
-//   const posts = await prismic.query(TODO);
+export const getStaticPaths: GetStaticPaths = async () => {
+  //   const prismic = getPrismicClient();
+  //   const posts = await prismic.query(TODO);
+  //   // TODO
+  return {
+    paths: [],
+    fallback: 'blocking',
+  };
+};
 
-//   // TODO
-// };
+export const getStaticProps: GetStaticProps = async ({ params }) => {
+  const { slug } = params;
+  const prismic = getPrismicClient();
+  const response = await prismic.getByUID('posts', String(slug), {});
 
-// export const getStaticProps = async context => {
-//   const prismic = getPrismicClient();
-//   const response = await prismic.getByUID(TODO);
+  const post = {
+    first_publication_date: response.first_publication_date,
+    data: {
+      title: response.data.title,
+      banner: {
+        url: response.data.banner.url,
+      },
+      author: response.data.author,
+      content: {
+        heading: response.data.content[0].heading,
+        body: {
+          text: RichText.asText(response.data.content[0].body),
+        },
+      },
+    },
+  };
 
-//   // TODO
-// };
+  return {
+    props: {
+      post,
+      redirect: 60 * 30, // 30 minutes
+    },
+  };
+};
