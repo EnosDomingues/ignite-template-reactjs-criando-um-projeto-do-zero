@@ -3,6 +3,9 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import { format } from 'date-fns';
 import { RichText } from 'prismic-dom';
 import { FiCalendar, FiUser, FiClock } from 'react-icons/fi';
+import Prismic from '@prismicio/client';
+import ptBR from 'date-fns/locale/pt-BR';
+import { useRouter } from 'next/router';
 import Header from '../../components/Header';
 import { getPrismicClient } from '../../services/prismic';
 
@@ -31,50 +34,83 @@ interface PostProps {
 }
 
 export default function Post({ post }: PostProps): JSX.Element {
+  const router = useRouter();
+
+  const readTime = post?.data.content.reduce((sumTotal, content) => {
+    const textTime = RichText.asText(content.body).split(' ').length;
+    return Math.ceil(sumTotal + textTime / 200);
+  }, 0);
+
   return (
     <>
-      <Header />
-      <div className={styles.banner}>
-        <img src={post.data.banner.url} alt="banner" />
-      </div>
-      <main className={commonStyles.container}>
-        <div className={styles.content}>
-          <h1>{post.data.title}</h1>
-          <div className={styles.icons}>
-            <time>
-              <FiCalendar />
-              {post.first_publication_date}
-            </time>
-            <span>
-              <FiUser />
-              {post.data.author}
-            </span>
-            <span>
-              <FiClock />
-              {`${Math.ceil(
-                RichText.asText(post.data.content[0].body[0].text).split(' ')
-                  .length / 200
-              )} min`}
-            </span>
+      {router.isFallback ? (
+        <h1 className={styles.isLoading}>Carregando...</h1>
+      ) : (
+        <>
+          <Header />
+          <div className={styles.banner}>
+            <img src={post.data.banner.url} alt="banner" />
           </div>
-          <div
-            className={styles.postContent}
-            dangerouslySetInnerHTML={{
-              __html: RichText.asHtml(post.data.content[0].body[0].text),
-            }}
-          />
-        </div>
-      </main>
+          <main className={commonStyles.container}>
+            <div className={styles.content}>
+              <h1>{post.data.title}</h1>
+              <div className={styles.icons}>
+                <time>
+                  <FiCalendar />
+                  {format(
+                    new Date(post.first_publication_date),
+                    'dd MMM yyyy',
+                    {
+                      locale: ptBR,
+                    }
+                  )}
+                </time>
+                <span>
+                  <FiUser />
+                  {post.data.author}
+                </span>
+                <span>
+                  <FiClock />
+                  {readTime} min
+                  {/*                   */}
+                </span>
+              </div>
+              {post.data.content.map(({ heading, body }) => (
+                <div key={heading} className={styles.postContent}>
+                  <h2>{heading}</h2>
+                  <div
+                    className={styles.bodyWrapper}
+                    dangerouslySetInnerHTML={{ __html: RichText.asHtml(body) }}
+                  />
+                </div>
+              ))}
+            </div>
+          </main>
+        </>
+      )}
     </>
   );
 }
 
 export const getStaticPaths: GetStaticPaths = async () => {
-  //   const prismic = getPrismicClient();
-  //   const posts = await prismic.query(TODO);
-  //   // TODO
+  const prismic = getPrismicClient();
+  const { results } = await prismic.query(
+    Prismic.predicates.at('document.type', 'posts'),
+    {
+      pageSize: 2,
+    }
+  );
+
+  const hotPosts = results.map(post => {
+    return {
+      params: {
+        slug: post.uid,
+      },
+    };
+  });
+
   return {
-    paths: [],
+    paths: hotPosts,
     fallback: true,
   };
 };
@@ -85,26 +121,14 @@ export const getStaticProps: GetStaticProps = async ({ params }) => {
   const response = await prismic.getByUID('posts', String(slug), {});
 
   const post = {
-    first_publication_date: format(
-      new Date(response.first_publication_date),
-      'dd MMM yyyy'
-    ),
+    first_publication_date: response.first_publication_date,
+    ...response,
     data: {
+      ...response.data,
       title: response.data.title,
-      banner: {
-        url: response.data.banner.url,
-      },
+      banner: response.data.banner,
       author: response.data.author,
-      content: [
-        {
-          heading: response.data.content[0].heading,
-          body: [
-            {
-              text: response.data.content[0].body,
-            },
-          ],
-        },
-      ],
+      content: response.data.content,
     },
   };
 
