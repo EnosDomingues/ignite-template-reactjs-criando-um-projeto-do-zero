@@ -4,6 +4,7 @@ import { FiCalendar, FiUser } from 'react-icons/fi';
 import Prismic from '@prismicio/client';
 
 import Link from 'next/link';
+import { format } from 'date-fns';
 import { getPrismicClient } from '../services/prismic';
 
 import commonStyles from '../styles/common.module.scss';
@@ -69,20 +70,17 @@ export const getStaticProps: GetStaticProps = async () => {
   const { next_page, results } = await prismic.query(
     Prismic.predicates.at('document.type', 'posts'),
     {
-      pageSize: 2,
+      pageSize: 5,
     }
   );
 
   const posts = results.map(post => {
     return {
       uid: post.uid,
-      first_publication_date: new Date(
-        post.last_publication_date
-      ).toLocaleDateString('en-US', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-      }),
+      first_publication_date: format(
+        new Date(post.first_publication_date),
+        'dd MMM yyyy'
+      ),
       data: {
         title: post.data.title,
         subtitle: post.data.subtitle,
